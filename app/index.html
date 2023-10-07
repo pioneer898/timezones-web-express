@@ -1,0 +1,174 @@
+<head>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200&display=swap" rel="stylesheet">
+
+  <link href="styles.css" rel="stylesheet">
+
+  <script src="simple-timezones.js" type="text/javascript"></script>
+  <script src="appController.js" type="text/javascript"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+
+  <!-- Materialize -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+</head>
+<body>
+  <div class="main-body">
+    <div class="main-container">
+      <div class="zone-info-container">
+        <div class="time-row info-row time-box-sizing"></div>
+      </div>
+      <div class="zone-data-container">
+        <div class="time-row zone-row time-box-sizing">
+          <div>
+            <span id="main-time" class="title-large"></span>
+            <span id="main-second"></span>
+            <span id="main-am-pm"></span>
+          </div>
+          <div>
+            <span id="main-month"></span>
+            <span id="main-date"></span>
+            <span id="main-year"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Web Settings -->
+  <div id="settings-button">
+    <a class="btn-floating btn-large waves-effect grey darken-4 modal-trigger" href="#settings-modal">
+      <i class="material-icons">settings</i>
+    </a>
+  </div>
+  <div id="settings-modal" class="modal">
+    <div class="modal-content">
+      <h4>Settings</h4>
+      <div class="switch">
+        <label>Enable Animated Background (Increases CPU Usage)</label>
+        <br>
+        <label>
+          Off
+          <input type="checkbox" id="gradientswitch" onchange="setGradientAnimationFromSwitch(this);">
+          <span class="lever"></span>
+          On
+        </label>
+      </div>
+      <p class="range-field">
+        <label>Hour Offset</label>
+        <input type="range" id="hour-offset" min="0" max="23" onmouseup="setOffsetFromSlider(this);"/>
+        <span id="hour-offset-display"></span>
+      </p>
+      <h6>Timezones</h6>
+      <div id="zone-selectors">
+      </div>
+      <div class="add-container">
+        <i class="material-icons" onclick="addZoneSelect('')">add</i>
+      </div>
+    </div>
+  </div>
+  <!-- End Web Settings -->
+  
+</body>
+
+<script>
+  const ac = new AppController();
+  const settings = {
+    gradientAnimationEnabled: true,
+    offset: 3,
+    zones: []
+  }
+  ac.init();
+  loadSettingsFromUrl();
+  setZones(ac.zones);
+
+  $(document).ready(function(){
+    $('.modal').modal();
+  });
+
+  function loadSettingsFromUrl(){
+    const urlParams = new URLSearchParams(window.location.search);
+    setGradientAnimation(urlParams.get('ga') === 'true');
+    setOffset(parseInt(urlParams.get('of')) || 3);
+    setZones(JSON.parse(decodeURIComponent(urlParams.get('zones'))) || []);
+  }
+  function setUrl(){
+    history.pushState({},'',`?ga=${settings.gradientAnimationEnabled}&of=${settings.offset}&zones=${encodeURIComponent(JSON.stringify(settings.zones))}`);
+  }
+
+  function setGradientAnimation(gradientAnimationEnabled){
+    settings.gradientAnimationEnabled = gradientAnimationEnabled;
+    ac.setGradientAnimation(gradientAnimationEnabled);
+    setGradientSwitch(gradientAnimationEnabled);
+    setUrl();
+  }
+  function setGradientAnimationFromSwitch(e){
+    settings.gradientAnimationEnabled = $(e).prop('checked');
+    setGradientAnimation(settings.gradientAnimationEnabled);
+  }
+  function setGradientSwitch(enabled){
+    $('#gradientswitch').prop('checked',enabled);
+  }
+
+  function setOffset(offset){
+    settings.offset = offset;
+    ac.offset = settings.offset;
+    setOffsetSlider(settings.offset);
+    setUrl();
+    ac.redraw();
+  }
+  function setOffsetFromSlider(e){
+    setOffset(parseInt($('#hour-offset').val())+1);
+  }
+  function setOffsetSlider(offset){
+    $('#hour-offset-display').text(offset);
+    $('#hour-offset').val(offset-1)
+  }
+
+  function addZoneSelect(selectedZone){
+    let data = ac.allZones.reduce((acc,cv,idx)=>{
+      acc[cv] = null;
+      return acc;
+    },{});
+    let input = $.parseHTML(`
+      <div class="input-field col s12 zone-input">
+          <input type="text" class="autocomplete">
+          <i class="material-icons" onclick="deleteZone(this)">delete</i>
+      </div>
+    `);
+    $(input).children('input').val(selectedZone);
+    $('#zone-selectors').append(input);
+    $('input.autocomplete').autocomplete({
+      data: data,
+      onAutocomplete: ()=>{updateZonesFromSelect()}
+    });
+  }
+  function updateZonesFromSelect(){
+    newZones = [];
+    $('.autocomplete').each((idx,e)=>{
+      let val = $(e).val();
+      if(ac.allZones.includes(val)){
+        newZones.push(val);
+      }
+    });
+    setZones(newZones);
+  }
+  function setZones(zones){
+    settings.zones = zones;
+    $('#zone-selectors div').remove();
+    settings.zones.forEach(e=>{
+      addZoneSelect(e);
+    });
+    ac.zones = settings.zones;
+    setUrl();
+    ac.redraw();
+  }
+  function deleteZone(e){
+    $(e).closest('div.zone-input').remove();
+    updateZonesFromSelect();
+  }
+</script>
